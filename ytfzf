@@ -417,7 +417,8 @@ on_post_set_vars___ytfzf__() {
 	: "${invidious_instance:=$(get_random_invidious_instance)}"
 
 	#if there is no domain, use the chosen invidious instance
-	[ -z "${yt_video_link_domain}" ] && yt_video_link_domain="${invidious_instance}"
+	# ponytail: falls back to youtube.com when no instance was found, otherwise urls come out as "/watch?v=ID"
+	[ -z "${yt_video_link_domain}" ] && yt_video_link_domain="${invidious_instance:-https://www.youtube.com}"
 
 	export FZF_DEFAULT_OPTS="--margin=0,3,0,0 $FZF_DEFAULT_OPTS"
 
@@ -1671,6 +1672,40 @@ scrape_yt() {
 		}
 	]'
 	} <"$_tmp_json" >>"$output_json_file"
+}
+
+scrape_ytdlp() {
+	search=$1
+	[ "$search" = ":help" ] && print_info "Scrape youtube through ${ytdl_path}, no invidious and no html parsing" && return 100
+	output_json_file=$2
+	command_exists "${ytdl_path}" || die 3 "${ytdl_path} is not installed\n"
+
+	_get_invidious_thumb_quality_name
+
+	# ponytail: yt-dlp has no page concept here, so pages become a result count
+	_count=$((20 * ${pages_to_scrape:-1}))
+
+	print_info "Scraping Youtube (with ${ytdl_path}) ($search)"
+
+	# --flat-playlist keeps this to one request; it costs the upload date, which is not in the flat output
+	"${ytdl_path}" --dump-single-json --flat-playlist "ytsearch${_count}:${search}" |
+		jq '
+    '"$jq_pad_left"'
+		;
+	[ (.entries // [])[] | select(.ie_key == "Youtube") |
+		{
+			scraper: "ytdlp_search",
+			ID: .id,
+			url: "'"${yt_video_link_domain}"'/watch?v=\(.id)",
+			title: .title,
+			channel: (.channel // .uploader // ""),
+			thumbs: "https://i.ytimg.com/vi/\(.id)/'"$thumbnail_quality"'.jpg",
+			duration: (if (.duration|type) == "number" then "\(.duration / 60 | floor):\(pad_left(2; .duration % 60))" else "" end),
+			views: "\(.view_count // 0)",
+			date: (.upload_date // ""),
+			description: (.description // "")
+		}
+	]' >>"$output_json_file"
 }
 
 scrape_subscriptions() {
