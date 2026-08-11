@@ -1,6 +1,32 @@
 # NOTICE
 
-This project is no longer actively maintained, it should still work for the foreseeable future
+This is a fork of [pystardust/ytfzf](https://github.com/pystardust/ytfzf), which is no longer
+actively maintained. Upstream's last commit was 2024-09-26.
+
+Since then every public Invidious instance has stopped serving its API — `api.invidious.io` still
+lists instances, but all of them answer `/api/v1/*` with `401` or `403`, and none advertise
+`api: true`. The default `youtube` scraper resolves an empty instance and fails with
+`Nothing was scraped`.
+
+This fork adds a `ytdlp` scraper that searches through yt-dlp's `ytsearch`, so it needs neither
+Invidious nor YouTube HTML parsing:
+
+```sh
+ytfzf -c ytdlp "search terms"
+```
+
+To make it the default, put this in `~/.config/ytfzf/conf.sh`:
+
+```sh
+scrape="ytdlp"
+```
+
+The upstream `yt` scraper (`ytfzf -c yt`) still works and is faster — one HTTP request against
+youtube.com instead of a yt-dlp invocation. It parses YouTube's `ytInitialData` blob, so it breaks
+whenever YouTube reshapes that page; `ytdlp` is the durable fallback. Note that `ytdlp` results have
+no upload date, since `--flat-playlist` does not return one.
+
+Requires yt-dlp. Keep it current — a stale yt-dlp is what breaks this path first.
 
 ---
 
